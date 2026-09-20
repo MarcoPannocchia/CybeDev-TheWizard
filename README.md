@@ -1,16 +1,16 @@
 <div align="center">
 
 <!-- 🖼️ Replace with the generated banner (banner_thewizard.png) -->
-<img src="./docs/assets/TheWizard_banner.png" alt="TheWizard banner" width="100%">
+<img src="./docs/assets/TheWizard.png" alt="TheWizard banner" width="100%">
 
 # 🧙‍♂️ TheWizard
 
-**Modular Security Framework for Reconnaissance & System Analysis**
+**Educational async Python security-assessment toolkit — CS50x final project**
 
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Architecture](https://img.shields.io/badge/architecture-plugin--based-8A2BE2)]()
-[![Database](https://img.shields.io/badge/DB-PostgreSQL%20%2F%20asyncpg-336791?logo=postgresql&logoColor=white)]()
-[![Status](https://img.shields.io/badge/status-in%20development-yellow)]()
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![asyncio](https://img.shields.io/badge/async-aiohttp%20%2F%20asyncio-8A2BE2)]()
+[![nmap](https://img.shields.io/badge/scanning-python--nmap-orange)]()
+[![Status](https://img.shields.io/badge/status-v0.7.0%20%E2%80%94%20in%20development-yellow)]()
 [![License](https://img.shields.io/badge/license-see%20LICENSE.md-lightgrey)](./LICENSE.md)
 
 </div>
@@ -21,10 +21,11 @@
 
 - [About TheWizard](#about-thewizard)
 - [Architecture](#architecture)
-- [Modules](#modules)
+- [What's implemented (v0.7.0)](#whats-implemented-v070)
+- [Output tags](#output-tags)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Screenshots](#screenshots)
+- [Known issues](#known-issues)
 - [Roadmap](#roadmap)
 - [Disclaimer](#disclaimer)
 - [Author](#author)
@@ -33,42 +34,66 @@
 
 ## About TheWizard
 
-**TheWizard** is a modular security framework built for **reconnaissance** and **system analysis**. It's designed around a **plugin-based architecture** that allows independent, extensible tools to be developed without touching the core, keeping the codebase clean and easy to grow over time.
+**TheWizard** (internally `TheWidzard`) is an educational, fully asynchronous Python toolkit for security reconnaissance and vulnerability assessment, built as a CS50x final project. It combines `asyncio`/`aiohttp` for network I/O with `python-nmap` and raw sockets for port scanning and service fingerprinting.
 
-The project started as a hands-on learning path: every module is optimized step by step to build real development and cybersecurity skills, not just to "make the tool work."
-
-> ⚠️ Built exclusively for cybersecurity research and authorized testing in controlled environments.
+> ⚠️ Built exclusively for authorized testing in controlled environments (lab environments, permitted bug bounty, or your own assets).
 
 ---
 
 ## Architecture
 
-- **Facade pattern** as a unified entry point to the various modules
-- **Plugin-based architecture**: each tool is independent and pluggable without touching the core
-- **Asynchronous** (`asyncio`), with database access handled via `asyncpg`
-- Wordlists and support data are managed through a **local PostgreSQL database**, with the goal of syncing it with a homelab instance down the line
+TheWizard follows a **Facade pattern**: one orchestrator class inherits from several independent tool classes, each responsible for one phase of a security assessment. The single entry point is `Cast_Spell()`, which loops over every target in `self.urls` and calls each module's own orchestration method (its "**Spell**"):
 
-```
-TheWizard/
-├── core/                # Facade and module orchestration
-├── modules/
-│   ├── network_tool/     # Network scanning and analysis
-│   └── osint_tool/        # OSINT gathering (subdomain scanning, etc.)
-├── db/                   # PostgreSQL/asyncpg schema and access
-└── docs/                 # Documentation and study material
+```python
+class TheWizard(Reconnaissance_Tool,
+                Vulnerability_Assessment_Tool,
+                Exploitation_tool, Post_Exploitation_tool,
+                Network_tool, OSINT_tool):
+    ...
 ```
 
-*(indicative structure — adapt it to match the actual repo layout)*
+| Module | Spell | Role |
+|---|---|---|
+| `Reconnaissance_Tool` | `Recon_Spell(ip)` | port scanning (3 implementations), banner grabbing |
+| `Vulnerability_Assessment_Tool` | `Vuln_Asses_Spell(session, url)` | header analysis, CVE lookup, SSL/TLS check |
+| `Network_tool` | `Network_Spell(session, url)` | basic HTTP info gathering |
+| `OSINT_tool` | `OSINT_Spell(session, url)` | subdomain enumeration |
+| `Exploitation_tool` | `Exploit_Spell()` | placeholder — reserved for future modules |
+| `Post_Exploitation_tool` | `Post_Exploit_Spell()` | placeholder — reserved for future modules |
+
+Shared state (`wordlist`, `banners`, `security_headers`, `urls`) lives on the main class and is used across modules via `self`. It can be extended at runtime through `add_word()`, `add_header()`, `add_url()`.
+
+Blocking calls (`nmap`, raw `socket`) are never run directly inside an `async def`: `Nmap_port_scanning` is offloaded via `loop.run_in_executor`, and the socket-based scanner/banner grabber via `asyncio.to_thread`, so the event loop never stalls.
 
 ---
 
-## Modules
+## What's implemented (v0.7.0)
 
-### 🌐 Network_tool
-Module dedicated to scanning and analyzing network assets.
+**`Reconnaissance_Tool`**
+- Async TCP port scanner with banner capture (`Port_Scanner` / `_port_scanner`)
+- `python-nmap` wrapper with version detection (`Nmap_port_scanning`)
+- Socket-based port scanner + banner grabber, `ThreadPoolExecutor`-backed (`Socket_Port_Scanner`, `Socket_Banner_Grabber`)
+- Generic HTTP fetch (`fetch_info`)
+- Subdomain scanner driven by `self.wordlist` (`Subdomain_Scanner` / `_word_scan`)
 
-### 🔍 OSINT_tool
-Open-source intelligence gathering module, including the **Subdomain Scanner**, whose wordlist is populated dynamically from a database instead of static files or hardcoded values.
+**`Vulnerability_Assessment_Tool`** *(renamed from `Vulnerability_Assesment_Tool`, alias kept for compatibility)*
+- Security header analyzer (`Header_Analyzer`) — checks HSTS, X-Frame-Options, CSP, X-Content-Type-Options by default
+- CVE lookup against the NVD API, reusing the shared `aiohttp` session (`CVE_Lookup`)
+- SSL/TLS certificate checker — issuer, subject, expiry, warns under 30 days (`SSL_TSL_CHECKER`)
+
+**`Network_tool` / `OSINT_tool`**
+- Thin wrappers that call into `Reconnaissance_Tool` under a clearer pentest-phase naming
+
+**`Exploitation_tool` / `Post_Exploitation_tool`**
+- Still stubs — print a "ready for deployment" message, reserved for future work
+
+---
+
+## Output tags
+
+All output goes to stdout with consistent prefixes for easy parsing:
+
+`[TARGET]` `[STATUS]` `[BODY]` `[RESOLVED]` `[PORT]` `[BANNER]` `[OUTPUT-{port}]` `[OUTPUT-SOCKET]` `[FOUND]` `[MISSING]` `[CVE]` `[SSL]` `[WARNING]` `[ERROR]` `[CVE ERROR]` `[SSL ERROR]` `[DEBUG]`
 
 ---
 
@@ -78,44 +103,54 @@ Open-source intelligence gathering module, including the **Subdomain Scanner**, 
 git clone https://github.com/MarcoPannocchia/CybeDev-TheWizard.git
 cd CybeDev-TheWizard
 
+# system dependency
+sudo apt install nmap
+
 python -m venv venv
 source venv/bin/activate   # on Windows: venv\Scripts\activate
 
-pip install -r requirements.txt
+pip install aiohttp python-nmap
 ```
 
-Set up your PostgreSQL database connection in the config file before the first run.
+`socket`, `asyncio`, `ssl`, `datetime`, `urllib.parse`, `concurrent.futures` are part of the standard library — no extra install needed. Some nmap features may require root/admin privileges.
 
 ---
 
 ## Usage
 
-```bash
-python thewizard.py --module network_tool --target <IP/host>
-python thewizard.py --module osint_tool --target <domain>
+Targets, subdomain wordlist and headers are configured as class attributes on the main class (edit the source, or add them interactively at runtime):
+
+```python
+wizard = TheWizard()
+wizard.add_word()      # adds a subdomain word to check
+wizard.add_header()    # adds a security header to check
+wizard.add_url()       # adds a target URL
+
+asyncio.run(wizard.Cast_Spell())
 ```
 
-*(indicative syntax — update with the real commands once the CLI is stable)*
+```bash
+python TheWizard_v070.py
+```
+
+This runs the full flow — network info, OSINT/subdomain scan, DNS resolution, 3-layer port scan, header/CVE/SSL analysis — for every URL in `urls`.
 
 ---
 
-## Screenshots
+## Known issues
 
-<div align="center">
-<img src="./docs/assets/screenshot_cli.png" alt="TheWizard in action" width="80%">
-</div>
+- Naming inconsistency across a few module classes (`Exploitation_tool`, `Network_tool`, etc. use a lowercase `t`) — cosmetic, no functional impact
+- No rate-limit handling yet for the NVD CVE API — long banner lists can get throttled
+- `Exploitation_tool` / `Post_Exploitation_tool` are placeholders with no real logic
 
 ---
 
 ## Roadmap
 
-- [x] Plugin-based architecture with Facade pattern
-- [x] Network_tool module
-- [x] OSINT_tool module (subdomain scanner)
-- [x] Wordlist managed via PostgreSQL database
-- [ ] Sync DB with homelab instance
-- [ ] New analysis modules
-- [ ] Extended documentation for each module
+- [ ] Persist results with `sqlite3` (targets, ports, banners, CVEs, headers, subdomains, SSL checks)
+- [ ] Minimal UI (TUI or lightweight Flask/FastAPI web app) to launch scans and browse saved results
+- [ ] Implement `Exploitation_tool` / `Post_Exploitation_tool`
+- [ ] NVD API rate-limit handling
 
 ---
 
@@ -134,5 +169,5 @@ This tool is developed for educational and cybersecurity research purposes. The 
 [![Instagram](https://img.shields.io/badge/Instagram-marco__pannocchia-E4405F?logo=instagram&logoColor=white)](https://www.instagram.com/marco_pannocchia)
 
 <div align="center">
-<sub>Built with 🐍 Python, PostgreSQL and a lot of curiosity for cybersecurity.</sub>
+<sub>Built with 🐍 Python, asyncio and a lot of curiosity for cybersecurity.</sub>
 </div>
