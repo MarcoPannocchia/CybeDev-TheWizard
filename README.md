@@ -1,7 +1,7 @@
 <div align="center">
 
 <!-- 🖼️ Replace with the generated banner (banner_thewizard.png) -->
-<img src="./docs/assets/banner_TheWizard.png" alt="TheWizard banner" width="100%">
+<img src="./docs/assets/TheWizard_banner.png" alt="TheWizard banner" width="100%">
 
 # 🧙‍♂️ TheWizard
 
