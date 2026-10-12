@@ -33,7 +33,7 @@
 
 ## About TheWizard
 
-**TheWizard** (internally `TheWidzard` in some module/file names) is an educational, fully asynchronous Python toolkit for security reconnaissance, vulnerability assessment, network scanning, and OSINT, built as a CS50x final project. It combines `asyncio`/`aiohttp` for network I/O, `python-nmap` and raw sockets for port scanning and service fingerprinting, `asyncpg`/PostgreSQL for persistence, OWASP ZAP for active web-application scanning, and `arp-scan` for local-network discovery.
+**TheWizard** (internally `TheWizard` in some module/file names) is an educational, fully asynchronous Python toolkit for security reconnaissance, vulnerability assessment, network scanning, and OSINT, built as a CS50x final project. It combines `asyncio`/`aiohttp` for network I/O, `python-nmap` and raw sockets for port scanning and service fingerprinting, `asyncpg`/PostgreSQL for persistence, OWASP ZAP for active web-application scanning, and `arp-scan` for local-network discovery.
 
 > ⚠️ Built exclusively for authorized testing in controlled environments (lab environments, permitted bug bounty, or your own assets). The network-scanning and ARP/LAN-sweep features can reach and actively probe hosts beyond a single target URL — use accordingly.
 
